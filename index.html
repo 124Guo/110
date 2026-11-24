@@ -1,0 +1,322 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>系统安全警告</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000; color: #0f0; font-family: monospace, 'Courier New', Courier;
+    overflow: hidden; height: 100vh; width: 100vw; position: relative;
+  }
+  
+  /* 假终端背景 */
+  #terminal {
+    position: absolute; inset: 0; padding: 20px; font-size: 14px;
+    text-shadow: 0 0 5px #0f0; line-height: 1.5; opacity: 0.8;
+    overflow: hidden; pointer-events: none;
+  }
+  .line { margin-bottom: 5px; }
+
+  /* 警告遮罩 */
+  #warning-overlay {
+    position: fixed; inset: 0; background: rgba(255, 0, 0, 0.2);
+    display: none; justify-content: center; align-items: center;
+    flex-direction: column; z-index: 100; animation: flashBg 0.5s infinite alternate;
+  }
+  @keyframes flashBg { from { background: rgba(255, 0, 0, 0.1); } to { background: rgba(255, 0, 0, 0.4); } }
+  #warning-text {
+    color: #f00; font-size: clamp(24px, 6vw, 50px); font-weight: bold;
+    text-shadow: 0 0 20px #f00; margin-bottom: 20px; text-align: center;
+  }
+  #sub-warning { color: #fff; font-size: 16px; font-family: sans-serif; }
+
+  /* 摄像头展示区 */
+  #camera-container {
+    position: fixed; inset: 0; display: none; flex-direction: column;
+    justify-content: center; align-items: center; z-index: 90;
+    background: #000;
+  }
+  #video-wrapper {
+    position: relative; width: 100%; height: 100%; overflow: hidden;
+  }
+  video {
+    width: 100%; height: 100%; object-fit: cover;
+    transform: scaleX(-1); /* 镜像翻转，像照镜子一样 */
+  }
+  /* 搞笑黑客滤镜 */
+  .hacker-filter {
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(rgba(0,255,0,0.1) 50%, rgba(0,0,0,0.25) 50%);
+    background-size: 100% 4px;
+  }
+  .scanline {
+    position: absolute; top: 0; left: 0; width: 100%; height: 5px;
+    background: rgba(0, 255, 0, 0.5); box-shadow: 0 0 10px #0f0;
+    animation: scan 2s linear infinite; pointer-events: none;
+  }
+  @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+
+  /* 假的发送进度 */
+  #hacking-ui {
+    position: absolute; top: 20px; left: 20px; right: 20px;
+    z-index: 95; color: #0f0; font-weight: bold;
+    text-shadow: 1px 1px 2px #000;
+  }
+  .progress-bar {
+    width: 100%; height: 10px; border: 1px solid #0f0; margin-top: 5px;
+    background: #000; position: relative;
+  }
+  .progress-fill {
+    height: 100%; width: 0%; background: #0f0; transition: width 0.1s linear;
+  }
+
+  /* 假微信界面 */
+  #fake-wechat {
+    position: fixed; inset: 0; background: #ededed; z-index: 200;
+    display: none; flex-direction: column;
+  }
+  .wx-header {
+    background: #f2f2f2; padding: 15px; text-align: center;
+    font-weight: bold; border-bottom: 1px solid #ddd; color: #333; font-family: sans-serif;
+  }
+  .wx-body {
+    flex: 1; padding: 15px; display: flex; flex-direction: column;
+  }
+  .wx-msg {
+    display: flex; margin-bottom: 15px; align-items: flex-start;
+  }
+  .wx-avatar {
+    width: 40px; height: 40px; background: #555; border-radius: 4px; margin-right: 10px;
+    display: flex; justify-content: center; align-items: center; color: white; font-size: 12px;
+  }
+  .wx-content {
+    background: #fff; padding: 10px; border-radius: 5px; position: relative;
+    max-width: 70%; font-family: sans-serif; color: #333; font-size: 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .wx-content::before {
+    content: ''; position: absolute; left: -6px; top: 12px;
+    border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid #fff;
+  }
+  .wx-img {
+    width: 150px; height: 200px; object-fit: cover; border-radius: 4px;
+    display: block; margin-top: 5px; transform: scaleX(-1);
+  }
+
+  /* 最终真相 */
+  #joke-reveal {
+    position: fixed; inset: 0; background: #000; z-index: 300;
+    display: none; flex-direction: column; justify-content: center; align-items: center;
+  }
+  #joke-text {
+    color: #ff5c98; font-size: clamp(30px, 8vw, 60px); font-weight: bold;
+    font-family: 'PingFang SC', sans-serif; text-shadow: 0 0 20px #ff5c98;
+    animation: popIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+  #joke-sub { color: #aaa; font-size: 18px; margin-top: 20px; font-family: sans-serif; }
+  @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+  /* 初始按钮 */
+  #start-btn {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    padding: 15px 40px; font-size: 20px; background: #111; color: #0f0;
+    border: 2px solid #0f0; box-shadow: 0 0 15px #0f0; border-radius: 5px;
+    cursor: pointer; z-index: 50; font-family: monospace; font-weight: bold;
+  }
+  #start-btn:active { background: #0f0; color: #000; }
+</style>
+</head>
+<body>
+
+<!-- 假黑客代码背景 -->
+<div id="terminal"></div>
+
+<!-- 开始按钮 -->
+<button id="start-btn">运行安全检测程序</button>
+
+<!-- 警告层 -->
+<div id="warning-overlay">
+  <div id="warning-text">⚠️ 警告 ⚠️<br>检测到未知设备接入</div>
+  <div id="sub-warning">正在绕过防火墙，强行调用前置摄像头...</div>
+</div>
+
+<!-- 摄像头层 -->
+<div id="camera-container">
+  <div id="hacking-ui">
+    <div>正在采集面部数据... <span id="percent">0%</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+  </div>
+  <div id="video-wrapper">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="hacker-filter"></div>
+    <div class="scanline"></div>
+  </div>
+</div>
+
+<!-- 假微信层 -->
+<div id="fake-wechat">
+  <div class="wx-header">文件传输助手</div>
+  <div class="wx-body">
+    <div class="wx-msg">
+      <div class="wx-avatar">系统</div>
+      <div class="wx-content">
+        [系统提示] 成功捕获目标！
+        <img id="wechat-img" class="wx-img" alt="captured">
+        已发送至主人微信，请查收。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 真相层 -->
+<div id="joke-reveal">
+  <div id="joke-text">愚人节快乐！🎉</div>
+  <div id="joke-sub">照片没有发出去，别慌~ (其实你刚刚的样子被丑化了)</div>
+</div>
+
+<script>
+  // 1. 生成假黑客终端背景
+  const term = document.getElementById('terminal');
+  const hexChars = '0123456789ABCDEF';
+  const sysTexts = [
+    '> Initializing exploit framework...',
+    '> Bypassing CORS policy...',
+    '> Accessing media devices...',
+    '> Target IP: 192.168.1.' + Math.floor(Math.random() * 255),
+    '> Scanning ports 80, 443, 8080...',
+    '> Warning: Intrusion detected.',
+    '> Injecting payload...',
+    '> 0x00A1F3: 4A 6F 6B 65 20 49 73 20 4F 6E 20 59 6F 75',
+    '> Capturing frame buffer...'
+  ];
+  
+  function createTerminalLine() {
+    const line = document.createElement('div');
+    line.className = 'line';
+    if (Math.random() > 0.5) {
+      // 假十六进制代码
+      let hex = '';
+      for(let i=0; i<30; i++) hex += hexChars[Math.floor(Math.random()*16)];
+      line.innerText = `0x${hex}`;
+      line.style.color = '#050'; // 暗绿色
+    } else {
+      line.innerText = sysTexts[Math.floor(Math.random() * sysTexts.length)];
+    }
+    term.appendChild(line);
+    if (term.childElementCount > 30) term.removeChild(term.firstChild);
+  }
+  setInterval(createTerminalLine, 100);
+
+  // 2. 核心恶搞逻辑
+  const startBtn = document.getElementById('start-btn');
+  const warningOverlay = document.getElementById('warning-overlay');
+  const cameraContainer = document.getElementById('camera-container');
+  const video = document.getElementById('video');
+  const progress = document.getElementById('progress');
+  const percentText = document.getElementById('percent');
+  const fakeWechat = document.getElementById('fake-wechat');
+  const wechatImg = document.getElementById('wechat-img');
+  const jokeReveal = document.getElementById('joke-reveal');
+
+  startBtn.addEventListener('click', async () => {
+    startBtn.style.display = 'none';
+    
+    // 播放假警告
+    warningOverlay.style.display = 'flex';
+    
+    // 警告显示 2 秒后，尝试调用摄像头
+    setTimeout(async () => {
+      try {
+        // 调用摄像头（如果没有摄像头或者拒绝，会直接进入 catch）
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        
+        // 成功获取权限，显示摄像头画面
+        video.srcObject = stream;
+        warningOverlay.style.display = 'none';
+        cameraContainer.style.display = 'flex';
+        
+        // 模拟抓拍进度条
+        let p = 0;
+        const interval = setInterval(() => {
+          p += Math.random() * 5;
+          if (p > 100) p = 100;
+          progress.style.width = p + '%';
+          percentText.innerText = Math.floor(p) + '%';
+          
+          if (p === 100) {
+            clearInterval(interval);
+            // 抓拍画面（把视频画面画到 canvas 上并转为图片）
+            capturePhoto();
+          }
+        }, 100);
+        
+      } catch (err) {
+        // 如果用户拒绝授权，或者设备没有摄像头
+        // 依然继续走恶搞流程，但展示一张网图或黑屏
+        warningOverlay.style.display = 'none';
+        cameraContainer.style.display = 'flex';
+        video.style.display = 'none';
+        
+        let p = 0;
+        const interval = setInterval(() => {
+          p += Math.random() * 10;
+          if (p > 100) p = 100;
+          progress.style.width = p + '%';
+          percentText.innerText = Math.floor(p) + '%';
+          
+          if (p === 100) {
+            clearInterval(interval);
+            // 抓不到真实照片，假装发送一张搞笑的默认图
+            wechatImg.src = 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Felix'; // 一个像素头像占位
+            showWechat();
+          }
+        }, 100);
+      }
+    }, 2000);
+  });
+
+  function capturePhoto() {
+    // 创建 canvas 抓取当前视频帧
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    // 翻转一下画布，因为视频是镜像的
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // 获取图片数据（测试用，实际不会发送）
+    const dataUrl = canvas.toDataURL('image/jpeg');
+    wechatImg.src = dataUrl;
+    
+    // 停止摄像头
+    const stream = video.srcObject;
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+
+    showWechat();
+  }
+
+  function showWechat() {
+    cameraContainer.style.display = 'none';
+    
+    // 伪造发送进度
+    setTimeout(() => {
+      fakeWechat.style.display = 'flex';
+      
+      // 2秒后揭晓真相
+      setTimeout(() => {
+        fakeWechat.style.display = 'none';
+        jokeReveal.style.display = 'flex';
+      }, 2500);
+      
+    }, 500);
+  }
+</script>
+</body>
+</html>
